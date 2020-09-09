@@ -1,0 +1,39 @@
+{
+    "Comment": "A Retry example of the Amazon States Language using an AWS Lambda Function",
+    "StartAt": "CheckDataReady",
+    "States": {
+      "CheckDataReady": {
+        "Type": "Task",
+        "Resource": "${DataCheckerFunctionArn}",
+        "Retry": [
+          {
+            "ErrorEquals": [
+              "DataNotReadyError"
+            ],
+            "IntervalSeconds": 1,
+            "MaxAttempts": 5 ,
+            "BackoffRate": 2
+          }
+        ],
+        "Next": "RunFargateTask"
+      },
+      "RunFargateTask": {
+        "Type": "Task",
+        "Resource": "arn:aws-cn:states:::ecs:runTask.sync",
+        "Parameters": {
+          "LaunchType": "FARGATE",
+          "Cluster": "${ECSClusterArn}",
+          "TaskDefinition": "${TaskDefinitionArn}",
+          "NetworkConfiguration": {
+            "AwsvpcConfiguration" : {
+              "Subnets" : [ 
+                "${SubnetId}"
+                ],
+              "AssignPublicIp" : "ENABLED"
+            }
+          }
+        },
+        "End": true
+      }
+    }
+  }

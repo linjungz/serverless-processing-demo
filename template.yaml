@@ -1,0 +1,97 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  workflow
+
+  Sample SAM Template for workflow
+
+Parameters: 
+  ECSClusterArnParameter:
+    Type: String
+    Default: arn:aws-cn:ecs:cn-northwest-1:402202783068:cluster/weride-video-process
+  TaskDefinitionArnParameter:
+    Type: String
+    Default: arn:aws-cn:ecs:cn-northwest-1:402202783068:task-definition/helloworld:6
+  SubnetIdParameter:
+    Type: String
+    Default: subnet-2b082a61
+
+
+Resources:
+  VideoProcessStateMachine:
+    Type: AWS::Serverless::StateMachine # More info about State Machine Resource: https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-statemachine.html
+    Properties:
+      DefinitionUri: statemachine/video_process_state_machine.json
+      DefinitionSubstitutions:
+        DataCheckerFunctionArn: !GetAtt DataCheckerFunction.Arn
+        ECSClusterArn: !Ref ECSClusterArnParameter
+        TaskDefinitionArn: !Ref TaskDefinitionArnParameter
+        SubnetId: !Ref SubnetIdParameter
+      Role:
+        !GetAtt StateMachineRole.Arn
+        
+
+  StateMachineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - states.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+      Policies:
+        - PolicyName: StatemachinePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "events:PutTargets" 
+                  - "events:DescribeRule"
+                  - "ecs:RunTask"
+                  - "events:PutRule"
+                  - "ecs:StopTask"
+                  - "ecs:DescribeTasks"
+                  - "iam:PassRole"
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource:
+                  - !GetAtt DataCheckerFunction.Arn
+        
+  DataCheckerFunction:
+    Type: AWS::Serverless::Function 
+    Properties:
+      CodeUri: functions/data_checker/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+  
+  TriggerFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: functions/trigger/
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      Policies:
+        - StepFunctionsExecutionPolicy:
+            StateMachineName: 
+              !GetAtt VideoProcessStateMachine.Name 
+      Events:
+        SQSTrigger:
+          Type: SQS 
+          Properties:
+            Queue: !GetAtt MySqsQueue.Arn
+            BatchSize: 10
+
+  MySqsQueue:
+    Type: AWS::SQS::Queue
+
+  
+
+  
