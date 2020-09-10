@@ -21,7 +21,6 @@
         "Type": "Task",
         "Resource": "arn:aws-cn:states:::ecs:runTask.sync",
         "Parameters": {
-          "LaunchType": "FARGATE",
           "Cluster": "${ECSClusterArn}",
           "TaskDefinition": "${TaskDefinitionArn}",
           "NetworkConfiguration": {
